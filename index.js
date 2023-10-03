@@ -115,6 +115,21 @@ document.getElementsByName('loopChoice').forEach((element) => {
     });
 });
 
+document.getElementById('doneButton').addEventListener('click', () => {
+    latlng = document.getElementById('locationInput').value;
+    console.log(`location ${latlng}`);
+    lat = parseFloat(latlng.split(',')[0]);
+    lng = parseFloat(latlng.split(',')[1]);
+    ll = L.latLng(lat, lng);
+    if (marker === null) {
+        console.log(`init marker ${ll}`);
+        marker = L.marker(ll, {draggable: true});
+    }
+    myTeleport(marker, ll)
+});
+
+
+
 
 map.on('click', function(e) {
     if (!initMain(e)) {
@@ -168,7 +183,20 @@ function initMain(e) {
 
 // return true if teleported, false if canceled teleportation
 function teleport(latlng) {
-    const choice = confirm('Teleport?')
+    const choice = confirm(`Teleport?\n latlng:${latlng}`)
+    if (choice) {
+        marker.setLatLng(latlng);
+        markerShadowPos = latlng;
+        sendLocation(`${markerShadowPos.lat},${markerShadowPos.lng}`)
+        clearSteps();
+    }
+    return choice;
+}
+
+
+// return true if teleported, false if canceled teleportation
+function myTeleport(marker, latlng) {
+    const choice = confirm(`Teleport?\n latlng:${latlng}`)
     if (choice) {
         marker.setLatLng(latlng);
         markerShadowPos = latlng;
