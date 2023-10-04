@@ -1,64 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <base target="_top">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kinesis</title>
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/bootstrap@5.0.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="main.css"/>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap@5.0.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="main.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="card" id="control-panel">
+      <div class="card-body">
+        <div class="btn-group btn-group-sm" role="group" x-data="{location: ''}">
+          <input
+            type="text"
+            class="form-control form-control-sm"
+            id="locationInput"
+            placeholder="location"
+            x-model="location"
+          />
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm"
+            id="doneButton"
+            @click="click(location)"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
     <script src="https://unpkg.com/socket.io@4.7.2/client-dist/socket.io.min.js"></script>
     <script src="https://unpkg.com/geolib@3.3.4/lib/index.js"></script>
     <script src="https://unpkg.com/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
-</head>
-<body>
-<div id="map"></div>
-<div class="card" id="control-panel">
-    <div class="card-body">
+    <script type="text/javascript">
+      const socket = io();
 
-        <div class="btn-group btn-group-sm" role="group" aria-label="Basic checkbox toggle button group">
-            <input type="checkbox" class="btn-check" id="pauseSwitch" autocomplete="off">
-            <label class="btn btn-outline-primary" for="pauseSwitch">Pause</label>
-            <button type="button" class="btn btn-outline-primary" id="undoButton">Undo</button>
-            <button type="button" class="btn btn-outline-primary" id="stopButton">Clear</button>
-        </div>
+      const saveConfig = (key, value) => {
+        console.log(`save ${key}=${value}`);
+        localStorage.setItem(`kinesis-${key}`, value);
+      };
 
-        <div class="btn-group btn-group-sm" role="group">
-            <input type="radio" class="btn-check" name="speedChoice" id="speedChoice1" autocomplete="off" value="1" checked>
-            <label class="btn btn-outline-primary" for="speedChoice1">Walk</label>
+      const sendLocation = (latlng) => {
+        console.log(`emit location ${latlng}`);
+        socket.emit('location', latlng);
+      };
 
-            <input type="radio" class="btn-check" name="speedChoice" id="speedChoice2" autocomplete="off" value="5">
-            <label class="btn btn-outline-primary" for="speedChoice2">Ride</label>
+      const loadConfig = (key, fallback) => {
+        const value = localStorage.getItem(`kinesis-${key}`);
+        if (!value) {
+          saveConfig(key, fallback);
+        }
+        return value ? value : fallback;
+      };
 
-            <input type="radio" class="btn-check" name="speedChoice" id="speedChoice3" autocomplete="off" value="20">
-            <label class="btn btn-outline-primary" for="speedChoice3">Drive</label>
-        </div>
+      // return true if teleported, false if canceled teleportation
+      function teleport(latlng) {
+        const choice = confirm(`Teleport?\n latlng:${latlng}`);
+        if (choice) {
+          if (window.marker) {
+            window.marker.remove();
+            window.marker = null;
+          }
 
-        <div class="btn-group btn-group-sm" role="group">
-            <input type="radio" class="btn-check" name="loopChoice" id="loopChoice1" autocomplete="off" value="off" checked>
-            <label class="btn btn-outline-primary" for="loopChoice1">Off</label>
+          window.marker = L.marker(latlng, { draggable: false });
+          console.log(marker);
+          window.marker.addTo(window.map);
+          sendLocation(`${latlng.lat},${latlng.lng}`);
+        }
+        return choice;
+      }
 
-            <input type="radio" class="btn-check" name="loopChoice" id="loopChoice2" autocomplete="off" value="loop">
-            <label class="btn btn-outline-primary" for="loopChoice2">Loop</label>
+      function click(latlng) {
+        lat = parseFloat(latlng.split(',')[0]);
+        lng = parseFloat(latlng.split(',')[1]);
+        ll = L.latLng(lat, lng);
+        const choice = confirm(`Teleport?\n latlng:${latlng}`);
+        if (choice) {
+          if (window.marker) {
+            window.marker.remove();
+            window.marker = null;
+          }
 
-            <input type="radio" class="btn-check" name="loopChoice" id="loopChoice3" autocomplete="off" value="uturn">
-            <label class="btn btn-outline-primary" for="loopChoice3">U-Turn</label>
-        </div>
+          window.marker = L.marker(ll, { draggable: false });
+          console.log(marker);
+          window.marker.addTo(window.map);
+          sendLocation(`${ll.lat},${ll.lng}`);
+        }
+        return choice;
+      }
 
-        <div class="btn-group btn-group-sm" role="group">
-            <input type="text" class="form-control form-control-sm" id="locationInput" placeholder="location">
-            <button type="button" class="btn btn-outline-primary btn-sm" id="doneButton">Done</button>
-        </div>
+      document.addEventListener('alpine:init', () => {
+        const center = L.latLng(
+          loadConfig('latitude', -36.8594224),
+          loadConfig('longitude', 174.5413183)
+        );
+        const map = L.map('map', {
+          center: center,
+          zoom: 12,
+          doubleClickZoom: false,
+        });
 
-    </div>
-</div>
+        window.map = map;
 
-<script src="index.js"></script>
-</body>
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(map);
+
+        window.marker = null;
+
+        map.on('click', function (e) {
+          teleport(e.latlng);
+        });
+
+        map.on('zoomend', function () {
+          console.log('zoomend');
+          saveConfig('zoom', map.getZoom());
+        });
+
+        map.on('moveend', function () {
+          console.log('moveend');
+          const c = map.getCenter();
+          saveConfig('latitude', c.lat);
+          saveConfig('longitude', c.lng);
+        });
+      });
+    </script>
+  </body>
 </html>
